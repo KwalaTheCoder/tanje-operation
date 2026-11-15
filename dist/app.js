@@ -68,8 +68,8 @@ function seed(){
   return {schema:2,sample:true,openingDate:offset(today,-7),menu,opening,records,purchases,activity:[]};
 }
 function stockStages(state,branch,until){
-  const raw={...state.opening[branch]}, executiveRaw={}, portions={};
-  for(const m of Object.keys(raw)){raw[m]=state.openingDate&&until<state.openingDate?0:raw[m];executiveRaw[m]=0;portions[m]=0;}
+  const raw={...state.opening[branch]}, executiveRaw={}, portions={}, preparationLoss={};
+  for(const m of Object.keys(raw)){raw[m]=state.openingDate&&until<state.openingDate?0:raw[m];executiveRaw[m]=0;portions[m]=0;preparationLoss[m]=0;}
   for(const x of state.records){
     if(x.date>until)continue;
     if(x.type==='move'&&x.b===branch)raw[x.m]=(raw[x.m]||0)+x.qty;
@@ -77,6 +77,7 @@ function stockStages(state,branch,until){
     if(x.type==='portion'){
       raw[x.m]=(raw[x.m]||0)-x.qty;
       portions[x.m]=(portions[x.m]||0)+x.portionQty*x.weight;
+      preparationLoss[x.m]=(preparationLoss[x.m]||0)+round(x.qty-x.portionQty*x.weight);
     }
     if(x.type==='execMove'){
       raw[x.m]=(raw[x.m]||0)-x.qty;
@@ -92,7 +93,7 @@ function stockStages(state,branch,until){
     if(x.type==='sale')for(const [m,v] of Object.entries(x.recipe))consume(m,v*x.qty);
     if(x.type==='waste')consume(x.m,x.qty);
   }
-  return {raw,executiveRaw,portions,total:Object.fromEntries(Object.keys(raw).map(m=>[m,round((raw[m]||0)+(executiveRaw[m]||0)+(portions[m]||0))]))};
+  return {raw,executiveRaw,portions,preparationLoss,total:Object.fromEntries(Object.keys(raw).map(m=>[m,round((raw[m]||0)+(executiveRaw[m]||0)+(portions[m]||0))]))};
 }
 function balance(state,b,day){
   if(b!=='central')return stockStages(state,b,day).total;
@@ -191,7 +192,7 @@ function inventory(){
   const own=balance(data,b,day), stages=stockStages(data,b,day), central=balance(data,'central',day), rows=stockKeys.filter(m=>material[m][0].includes(search));
   return head('انبار و خرید','ثبت مقدار تحویلی، دسته‌بندی مواد و بررسی بودجه خرید.',btn('افزودن ماده','new:material','','plus')+btn('درخواست خرید','new:purchase','','plus')+btn('ثبت بار ورودی','new:receive','primary','plus'))
     +card('موجودی مواد اولیه','مانده سیستمی در پایان تاریخ انتخابی',table(['ماده','دسته‌بندی','انبار مرکزی','موجودی مجموعه','وضعیت مجموعه'],rows.map(m=>[E(material[m][0]),E(material[m][2]),unit(m,central[m]),unit(m,own[m]),own[m]<material[m][4]?badge('نیاز به تأمین','bad'):badge('موجود')]),'ماده‌ای با این نام پیدا نشد.'),`<input class="filter" id="search" placeholder="جست‌وجوی ماده…" aria-label="جست‌وجوی ماده" value="${E(search)}">`)
-    +card('گردش سه‌مرحله‌ای انبار','پورشن آماده بلافاصله وارد بخش اجرایی می‌شود؛ مقدارها بر حسب واحد ماده هستند.',btn('ثبت پورشن‌بندی','new:portion','primary','plus')+btn('تحویل خام به اجرا','new:execMove','','truck')+table(['ماده','خام شعبه','خام بخش اجرایی','پورشن آماده در اجرا','کل مانده'],rows.map(m=>[E(material[m][0]),unit(m,stages.raw[m]||0),unit(m,stages.executiveRaw[m]||0),unit(m,stages.portions[m]||0),unit(m,own[m]||0)])))
+    +card('گردش سه‌مرحله‌ای انبار','پورشن آماده بلافاصله وارد بخش اجرایی می‌شود؛ مقدارها بر حسب واحد ماده هستند.',btn('ثبت پورشن‌بندی','new:portion','primary','plus')+btn('تحویل خام به اجرا','new:execMove','','truck')+table(['ماده','خام شعبه','خام بخش اجرایی','پورشن آماده در اجرا','افت آماده‌سازی','کل مانده'],rows.map(m=>[E(material[m][0]),unit(m,stages.raw[m]||0),unit(m,stages.executiveRaw[m]||0),unit(m,stages.portions[m]||0),unit(m,stages.preparationLoss[m]||0),unit(m,own[m]||0)])))
     +purchasePanel()
     +card('رسیدهای خرید','بار به انبار مرکزی وارد می‌شود و با حواله پخش به موجودی مجموعه منتقل می‌شود.',table(['ماده','ثبت خرید','شمارش تحویل','بودجه','ارزش بار','تسویه‌نشده / مازاد هزینه','مرجع'],rec('receive').map(x=>[E(material[x.m][0]),unit(x.m,x.ordered),unit(x.m,x.qty),money(x.budget),money(x.qty*x.price),badge(money(purchaseGap(x)),purchaseGap(x)?'bad':''),ref(x)])));
 }
