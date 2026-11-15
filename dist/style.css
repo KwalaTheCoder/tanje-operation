@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
 @font-face{font-family:Tanje;src:url(font.woff) format('woff');font-display:swap}
 :root{--bg:#f5f3ed;--surface:#fffcf6;--ink:#20332a;--muted:#626d62;--line:#e5dfd2;--gold:#c98f4d;--pale:#f2e7d6;--deep:#152d26;--green:#30654e;--red:#a04236;--shadow:0 4px 16px #29241706}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Tanje,Tahoma,Arial,sans-serif;font-size:14px;line-height:1.65}button,input,select,textarea{font:inherit}a{color:inherit}button,select{cursor:pointer}button{color:inherit}button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #a66422;outline-offset:3px}button:disabled{opacity:.45;cursor:default}h1,h2,h3,p{margin:0}svg{display:inline-block;vertical-align:middle;flex:none}small{font-size:11px}.skip{position:fixed;top:-100px;z-index:10}.skip:focus{top:8px}
@@ -75,3 +76,30 @@ dialog{background:#fff;border-radius:18px}.dialog-head{padding:19px 22px}.fields
 }
 @media(max-width:390px){.top select{width:112px}.top .iconbtn{min-width:32px}.date{font-size:10px}.stats .stat-val{font-size:19px}}
 @media(prefers-reduced-motion:reduce){.btn,.nav button{transition:none}}
+
+/* Typography-first refresh: deliberately noticeable without changing application logic. */
+:root{--bg:#f8faf8;--surface:#ffffff;--ink:#182d25;--muted:#64756c;--line:#e8eee9;--deep:#153e30;--gold:#b8915e}
+html,body,button,input,select,textarea{font-family:'Vazirmatn',Tanje,Tahoma,sans-serif!important}
+body{font-weight:400;font-size:13.5px;line-height:1.95}
+h1,h2,h3,.brand strong,.stat-val,.decision-strip strong{font-family:'Vazirmatn',Tanje,Tahoma,sans-serif!important;font-weight:800;letter-spacing:0!important}
+.page-head h1{font-size:25px;font-weight:800}.page-head p{font-size:12.5px;line-height:1.9}
+.card-head h2,.card h2{font-size:16px;font-weight:800}
+.card-head p{font-size:12px;line-height:1.9}
+.nav button{font-size:12.5px;font-weight:500}.nav button.active{font-weight:700}
+.btn{font-weight:700;font-size:12px}
+.stats .stat-val{font-size:25px}
+table{font-size:12px}th{font-weight:700}td:first-child{font-weight:700}
+.hero h1{font-size:30px;font-weight:800}
+.demo-boundary{font-size:11.5px}
+@media(max-width:760px){
+ body{font-size:13px}
+ .page-head h1{font-size:22px}
+ .card-head h2,.card h2{font-size:15.5px}
+ .card-head{padding-top:15px;padding-bottom:10px}
+ .card-body{padding-bottom:15px}
+ .stats .stat-val{font-size:20px}
+ .hero h1{font-size:24px!important}
+ .demo-boundary{font-size:11px}
+ .period-toolbar{font-size:11px}
+ .decision-strip strong{font-size:16px}
+}
