@@ -103,3 +103,54 @@ table{font-size:12px}th{font-weight:700}td:first-child{font-weight:700}
  .period-toolbar{font-size:11px}
  .decision-strip strong{font-size:16px}
 }
+
+/* Mobile-first simplification: keep all actions accessible without above-the-fold clutter. */
+@media(max-width:760px){
+ .top{min-height:62px;gap:5px;padding:8px 12px}
+ .top select{font-size:12px;max-width:160px}
+ .demo-boundary{margin:9px 12px 0;padding:9px 12px;display:flex;flex-direction:row;align-items:center;gap:8px;border-radius:11px}
+ .demo-boundary>div{min-width:0;flex:1}
+ .demo-boundary strong{display:block;margin:0;font-size:12px;line-height:1.5}
+ .demo-boundary span{display:block;margin:1px 0 0;font-size:10px;line-height:1.5;color:#746c60}
+ .demo-boundary .btn{flex:none;max-width:125px;white-space:normal;text-align:center;font-size:10px;line-height:1.45;padding:6px 8px}
+ .period-toolbar{margin:8px 12px 0;gap:6px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:11px}
+ .period-toolbar label{gap:6px;font-size:11px}
+ .period-toolbar input{max-width:125px;padding:5px 7px;font-size:11px}
+ .period-toolbar #workspace-label{display:none}
+ .period-toolbar [data-act="export-backup"]{margin-inline-start:auto;font-size:10px;padding:5px 7px;min-height:30px}
+ main{padding:12px 12px 24px}
+ .hero{padding:18px 18px!important;min-height:0;border-radius:14px;gap:0!important}
+ .hero-content{width:100%;max-width:none}
+ .hero .eyebrow{font-size:10px}
+ .hero h1{font-size:21px!important;line-height:1.55!important;margin-top:5px}
+ .hero p{font-size:11.5px;line-height:1.8;margin-top:5px}
+ .hero-buttons{margin-top:13px;gap:7px}
+ .hero-buttons .btn{font-size:11px;min-height:36px;padding:6px 10px}
+ .hero-summary{display:none!important}
+ .stats{margin:11px 0;gap:8px}
+ .stats article{padding:11px 12px}
+ .stat-top{font-size:10.5px}
+ .stat-top span{width:27px;height:27px;border-radius:8px}
+ .stats .stat-val{font-size:19px;margin:4px 0 2px}
+ .stat-sub{font-size:10px}
+ .card-head{padding:14px 14px 10px}
+ .card-body{padding:0 14px 14px}
+ .table-wrap{margin-inline:-14px;padding-inline:14px}
+ .page-head{gap:8px}
+ .page-head h1{font-size:21px}
+ .decision-strip{margin:12px 0}
+ .decision-strip>div{padding:11px}
+ .decision-strip strong{margin-top:3px}
+ .presentation-intro{padding:15px;margin:12px 0}
+ .presentation-intro h2{font-size:19px}
+ .scenario{gap:8px}
+ .scenario li{padding:10px}
+}
+@media(max-width:390px){
+ .demo-boundary span{font-size:9px}
+ .demo-boundary .btn{max-width:102px;font-size:9px}
+ .top select{max-width:115px}
+ .hero h1{font-size:20px!important}
+ .hero-buttons .btn{font-size:10px;padding:6px 8px}
+ .period-toolbar input{max-width:110px}
+}
