@@ -67,7 +67,35 @@ function seed(){
   }
   return {schema:2,sample:true,openingDate:offset(today,-7),menu,opening,records,purchases,activity:[]};
 }
+function stockStages(state,branch,until){
+  const raw={...state.opening[branch]}, executiveRaw={}, portions={};
+  for(const m of Object.keys(raw)){raw[m]=state.openingDate&&until<state.openingDate?0:raw[m];executiveRaw[m]=0;portions[m]=0;}
+  for(const x of state.records){
+    if(x.date>until)continue;
+    if(x.type==='move'&&x.b===branch)raw[x.m]=(raw[x.m]||0)+x.qty;
+    if(x.b!==branch)continue;
+    if(x.type==='portion'){
+      raw[x.m]=(raw[x.m]||0)-x.qty;
+      portions[x.m]=(portions[x.m]||0)+x.portionQty*x.weight;
+    }
+    if(x.type==='execMove'){
+      raw[x.m]=(raw[x.m]||0)-x.qty;
+      executiveRaw[x.m]=(executiveRaw[x.m]||0)+x.qty;
+    }
+    const consume=(m,qty)=>{
+      const p=Math.min(Math.max(0,portions[m]||0),qty);
+      portions[m]=(portions[m]||0)-p;qty-=p;
+      const e=Math.min(Math.max(0,executiveRaw[m]||0),qty);
+      executiveRaw[m]=(executiveRaw[m]||0)-e;qty-=e;
+      raw[m]=(raw[m]||0)-qty;
+    };
+    if(x.type==='sale')for(const [m,v] of Object.entries(x.recipe))consume(m,v*x.qty);
+    if(x.type==='waste')consume(x.m,x.qty);
+  }
+  return {raw,executiveRaw,portions,total:Object.fromEntries(Object.keys(raw).map(m=>[m,round((raw[m]||0)+(executiveRaw[m]||0)+(portions[m]||0))]))};
+}
 function balance(state,b,day){
+  if(b!=='central')return stockStages(state,b,day).total;
   const result=Object.fromEntries(Object.entries(state.opening[b]).map(([m,q])=>[m,state.openingDate&&day<state.openingDate?0:q]));
   for(const x of state.records){
     if(x.date>day)continue;
@@ -84,7 +112,7 @@ function validateState(state){
   verify(state&&typeof state==='object'&&Array.isArray(state.records)&&state.menu&&state.opening,'ساختار داده ذخیره‌شده قابل خواندن نیست.');
   for(const loc of Object.keys(locations))verify(state.opening[loc]&&stockKeys.every(m=>Number.isFinite(state.opening[loc][m])),'موجودی افتتاحیه ناقص است.');
   for(const branch of branchKeys)verify(Array.isArray(state.menu[branch])&&state.menu[branch].every(x=>x&&typeof x.name==='string'&&x.recipe&&typeof x.recipe==='object'),'ساختار منو معتبر نیست.');
-  for(const x of state.records){verify(x&&branchKeys.includes(x.b)&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&['sale','receive','move','waste','count'].includes(x.type),'یک گردش ذخیره‌شده معتبر نیست.');verify(Number.isFinite(x.qty)&&x.qty>=0,'مقدار گردش معتبر نیست.');if(x.type==='sale')verify(x.recipe&&Number.isFinite(x.price)&&x.price>=0&&Object.entries(x.recipe).every(([m,q])=>(material[m]||state.custom?.[m])&&Number.isFinite(q)&&q>=0),'ماده یا مقدار دستور و قیمت فروش معتبر نیست.');else {verify(material[x.m]||state.custom?.[x.m],'ماده گردش شناخته نشد.');if(x.type==='receive')verify(['price','ordered','budget','other'].every(k=>Number.isFinite(x[k])&&x[k]>=0),'مبلغ رسید معتبر نیست.');}}
+  for(const x of state.records){verify(x&&branchKeys.includes(x.b)&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&['sale','receive','move','waste','count','portion','execMove'].includes(x.type),'یک گردش ذخیره‌شده معتبر نیست.');verify(Number.isFinite(x.qty)&&x.qty>=0,'مقدار گردش معتبر نیست.');if(x.type==='sale')verify(x.recipe&&Number.isFinite(x.price)&&x.price>=0&&Object.entries(x.recipe).every(([m,q])=>(material[m]||state.custom?.[m])&&Number.isFinite(q)&&q>=0),'ماده یا مقدار دستور و قیمت فروش معتبر نیست.');else {verify(material[x.m]||state.custom?.[x.m],'ماده گردش شناخته نشد.');if(x.type==='receive')verify(['price','ordered','budget','other'].every(k=>Number.isFinite(x[k])&&x[k]>=0),'مبلغ رسید معتبر نیست.');if(x.type==='portion')verify(Number.isInteger(x.portionQty)&&x.portionQty>0&&Number.isFinite(x.weight)&&x.weight>0&&x.portionQty*x.weight<=x.qty+0.000001,'مقدار پورشن‌بندی معتبر نیست.');}}
   verify(!state.purchases||Array.isArray(state.purchases),'فهرست خرید ذخیره‌شده معتبر نیست.');
   return state;
 }
@@ -160,9 +188,10 @@ function overview(){
 }
 function branchPerformance(){return card('وضعیت شعب در بازه انتخابی','جدول مقایسه همه شعب؛ مستقل از فیلتر شعبه بالای صفحه. مبالغ: تومان.',table(['شعبه','فروش','بهای مواد فروش','دورریز','درخواست باز'],branchKeys.map(branch=>{const m=metrics(branch);return [E(branches[branch]),money(m.sales),money(m.cost),money(m.waste),N(m.pending)]})));}
 function inventory(){
-  const own=balance(data,b,day), central=balance(data,'central',day), rows=stockKeys.filter(m=>material[m][0].includes(search));
+  const own=balance(data,b,day), stages=stockStages(data,b,day), central=balance(data,'central',day), rows=stockKeys.filter(m=>material[m][0].includes(search));
   return head('انبار و خرید','ثبت مقدار تحویلی، دسته‌بندی مواد و بررسی بودجه خرید.',btn('افزودن ماده','new:material','','plus')+btn('درخواست خرید','new:purchase','','plus')+btn('ثبت بار ورودی','new:receive','primary','plus'))
     +card('موجودی مواد اولیه','مانده سیستمی در پایان تاریخ انتخابی',table(['ماده','دسته‌بندی','انبار مرکزی','موجودی مجموعه','وضعیت مجموعه'],rows.map(m=>[E(material[m][0]),E(material[m][2]),unit(m,central[m]),unit(m,own[m]),own[m]<material[m][4]?badge('نیاز به تأمین','bad'):badge('موجود')]),'ماده‌ای با این نام پیدا نشد.'),`<input class="filter" id="search" placeholder="جست‌وجوی ماده…" aria-label="جست‌وجوی ماده" value="${E(search)}">`)
+    +card('گردش سه‌مرحله‌ای انبار','پورشن آماده بلافاصله وارد بخش اجرایی می‌شود؛ مقدارها بر حسب واحد ماده هستند.',btn('ثبت پورشن‌بندی','new:portion','primary','plus')+btn('تحویل خام به اجرا','new:execMove','','truck')+table(['ماده','خام شعبه','خام بخش اجرایی','پورشن آماده در اجرا','کل مانده'],rows.map(m=>[E(material[m][0]),unit(m,stages.raw[m]||0),unit(m,stages.executiveRaw[m]||0),unit(m,stages.portions[m]||0),unit(m,own[m]||0)])))
     +purchasePanel()
     +card('رسیدهای خرید','بار به انبار مرکزی وارد می‌شود و با حواله پخش به موجودی مجموعه منتقل می‌شود.',table(['ماده','ثبت خرید','شمارش تحویل','بودجه','ارزش بار','تسویه‌نشده / مازاد هزینه','مرجع'],rec('receive').map(x=>[E(material[x.m][0]),unit(x.m,x.ordered),unit(x.m,x.qty),money(x.budget),money(x.qty*x.price),badge(money(purchaseGap(x)),purchaseGap(x)?'bad':''),ref(x)])));
 }
@@ -200,9 +229,11 @@ function cash(){
 }
 function audit(){
   const checks=counts(), issues=rec('receive').filter(x=>purchaseGap(x)||missingQty(x));
+  const shortages=checks.filter(x=>x.delta<0);
   return head('تطبیق و مغایرت‌ها','کنترل بودجه خرید و اختلاف شمارش فیزیکی با موجودی سیستم.',btn('ثبت شمارش','new:count','primary','plus'))
     +card('مغایرت خرید','بودجه تسویه‌نشده برابر است با بودجه منهای ارزش تحویل و مبالغ مستند.',table(['ماده','اختلاف سفارش و تحویل','بودجه','ارزش تحویل','مبالغ مستند','اختلاف بودجه','مرجع'],issues.map(x=>[E(material[x.m][0]),unit(x.m,missingQty(x)),money(x.budget),money(x.qty*x.price),money(x.other),badge(money(purchaseGap(x)),'bad'),ref(x)])))
     +card('شمارش فیزیکی','برای ثبت‌های جدید، مانده زمان شمارش ثابت می‌ماند؛ شمارش بعدی تاریخچه قبلی را حفظ می‌کند.',table(['ماده','سیستم هنگام ثبت','شمارش','اختلاف شمارش','ارزش اختلاف مرجع','پرسنل','توضیح'],checks.map(x=>[E(material[x.m][0]),unit(x.m,x.expected),unit(x.m,x.qty),badge(unit(x.m,x.delta),x.delta?'bad':''),money(x.value),N(x.staff),E(x.note||'—')])))
+    +card('کسری و ضایعات احتمالی','کسری مثبت به معنی مصرف بیشتر از استاندارد سفارش‌هاست؛ علت باید بررسی شود.',table(['ماده','کسری','ارزش تخمینی','وضعیت'],shortages.map(x=>[E(material[x.m][0]),unit(x.m,-x.delta),money(x.value),badge('نیازمند بررسی','bad')])))
     +info('مغایرت فقط برای بررسی ثبت می‌شود؛ کسر از حقوق، بدهی کارمند و اصلاح موجودی در این دمو اجرا نمی‌شود. ارزش اختلاف بر پایه بهای مرجع نمونه است.');
 }
 function waste(){
@@ -266,6 +297,8 @@ const formatGuide=(name,help,example)=>label(name,`<small>${E(help)}</small><tex
 const forms={
  purchase:['درخواست خرید نمونه','درخواست به شعبه انتخابی مرتبط است و پس از بررسی و تأیید نمایشی، دریافت جداگانه دارد.',()=>dateField()+label('ماده اولیه',chooseMaterial())+qtyField()+label('نرخ پیشنهادی واحد (تومان)',num('price'))+reference()+label('تأمین‌کننده پیشنهادی',desc('supplier',true))],
  receive:['ثبت بار ورودی','ثبت خرید و شمارش مستقل تحویل به انبار مرکزی.',()=>dateField()+label('ماده اولیه',chooseMaterial())+label('مقدار ثبت‌شده توسط خرید',num('ordered',0,'.001'))+qtyField('مقدار واقعی تحویل','.001')+label('بهای واحد (تومان)',num('price'))+label('بودجه تخصیصی (تومان)',num('budget'))+label('مبالغ تسویه‌شده مستند (تومان)',num('other',0,'1','value="0"'))+reference()+label('تأمین‌کننده / توضیح',desc(),true)],
+ portion:['ثبت پورشن‌بندی','مواد خام شعبه به پورشن آماده در بخش اجرایی تبدیل می‌شود. افت آماده‌سازی جداگانه محاسبه می‌شود.',()=>dateField()+label('ماده اولیه',chooseMaterial())+qtyField('مقدار خام مصرف‌شده')+label('تعداد پورشن آماده',num('portionQty',1))+label('مقدار هر پورشن به واحد ماده',num('weight',0.001,'.001'))+reference()+label('توضیح',desc())],
+ execMove:['تحویل ماده خام به اجرا','ماده خام بدون پورشن‌بندی به بخش اجرایی تحویل داده می‌شود.',()=>dateField()+label('ماده اولیه',chooseMaterial())+qtyField()+reference()+label('توضیح',desc())],
  move:['ثبت حواله پخش','موجودی از انبار مرکزی به مجموعه انتخابی منتقل می‌شود.',()=>dateField()+label('ماده اولیه',chooseMaterial())+qtyField()+reference()+label('پخش‌کننده / توضیح',desc('note',true),true)],
  moveCsv:['ورود گزارش پخش‌کننده','هر خط یک ردیف حواله. تمام ردیف‌ها با هم بررسی و ثبت می‌شوند.',()=>dateField()+formatGuide('ردیف‌های گزارش','ترتیب ستون‌ها با | جدا شود: نام ماده | نام مجموعه | مقدار | شناسه حواله | پخش‌کننده',`برنج ایرانی | ${branches[b]} | ۵ | پخش-۴ | پخش صبح`)],
  sale:['ثبت سفارش','ثبت فروش و کسر مواد از موجودی همین مجموعه.',()=>dateField()+label('آیتم منو',chooseItem())+label('تعداد آیتم',num('qty',1))+label('قیمت واقعی واحد (تومان)',num('price'))+label('پرداخت',select('method',options(salesTypes)))+reference()],
@@ -347,8 +380,20 @@ function applyEntry(state,f){
   verify(date&&date>='2020-01-01'&&Number.isFinite(Date.parse(date+'T12:00:00Z')),'تاریخ معتبر وارد کنید.');
   const base={type:current,b,date,id:crypto.randomUUID(),sample:key===presentationKey};
   if(linkedPurchase&&current==='receive'){const po=(state.purchases||[]).find(x=>x.id===linkedPurchase);verify(po&&['approved','partially_received'].includes(po.status)&&po.b===b,'سفارش مرتبط دیگر آماده دریافت نیست.');verify(po.m===f.m,'ماده دریافت باید با سفارش مرتبط یکسان باشد.');const already=sum(state.records.filter(x=>x.type==='receive'&&x.purchaseId===po.id),x=>x.qty);verify(numeric(f.qty,.001)<=round(po.qty-already),'دریافت نمی‌تواند از مانده سفارش بیشتر باشد.');base.purchaseId=po.id;po.status=round(already+numeric(f.qty))===po.qty?'received':'partially_received';}
-  if(['receive','move','count','waste'].includes(current))verify(stockKeys.includes(f.m),'ماده اولیه معتبر نیست.');
+  if(['receive','move','count','waste','portion','execMove'].includes(current))verify(stockKeys.includes(f.m),'ماده اولیه معتبر نیست.');
   if(current==='receive')rows.push({...base,m:f.m,qty:numeric(f.qty,.001),ordered:numeric(f.ordered),price:numeric(f.price,0,true),budget:numeric(f.budget,0,true),other:numeric(f.other,0,true),note:f.note,ref});
+  if(current==='portion'){
+    const qty=numeric(f.qty,.001),portionQty=numeric(f.portionQty,1),weight=numeric(f.weight,.001);
+    verify(Number.isInteger(portionQty),'تعداد پورشن باید عدد صحیح باشد.');
+    verify(portionQty*weight<=qty+0.000001,'مقدار پورشن‌های آماده از ماده خام بیشتر است.');
+    verify((stockStages(state,b,date).raw[f.m]||0)+0.000001>=qty,'موجودی خام شعبه برای پورشن‌بندی کافی نیست.');
+    rows.push({...base,m:f.m,qty,portionQty,weight,ref,note:f.note});
+  }
+  if(current==='execMove'){
+    const qty=numeric(f.qty,.001);
+    verify((stockStages(state,b,date).raw[f.m]||0)+0.000001>=qty,'موجودی خام شعبه برای تحویل به اجرا کافی نیست.');
+    rows.push({...base,m:f.m,qty,ref,note:f.note});
+  }
   if(current==='move')rows.push({...base,m:f.m,qty:numeric(f.qty,.001),note:f.note,ref});
   if(current==='sale')rows.push(saleRecord(state.menu[b].find(x=>x.id===f.item),f.qty,f.price,f.method,date,ref));
   if(current==='count'){
@@ -384,7 +429,7 @@ function applyEntry(state,f){
     row.id??=crypto.randomUUID();
     state.records.push(row);
   }
-  if(rows.some(x=>['move','sale','waste'].includes(x.type))){
+  if(rows.some(x=>['move','sale','waste','portion','execMove'].includes(x.type))){
     ensureStock(state,new Set(rows.flatMap(x=>x.type==='move'?['central',x.b]:[x.b])),date);
   }
 }
